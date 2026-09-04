@@ -13,6 +13,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import umap as umap_lib
 
 from utils.display import ordered_subtypes, shorten, subtype_color_map

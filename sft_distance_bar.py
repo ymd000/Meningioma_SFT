@@ -15,6 +15,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd 
 from sklearn.metrics.pairwise import cosine_similarity as cos_sim, euclidean_distances
 
 from utils.display import make_abbrev, ordered_subtypes, subtype_color_map
