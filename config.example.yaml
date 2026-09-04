@@ -1,0 +1,152 @@
+# config.example.yaml — このファイルを config.yaml にコピーして各パスを設定する
+# cp config.example.yaml config.yaml
+
+# ---- ラベル ----
+label:
+  site_a:
+    label:   path/to/site_a/case_labels.csv
+    subtype: path/to/site_a/case_subtypes.csv
+  site_b:
+    label:   path/to/site_b/case_labels.csv
+    subtype: path/to/site_b/case_subtypes.csv
+
+# ---- 埋め込み ----
+embedding:
+  site_a:
+    original:   path/to/site_a/embedding      # HDF5 ファイル群のディレクトリ
+    centroid:   path/to/centroid/site_a       # centroid.py が書き出す先
+    gan:        path/to/gan/site_a            # gan.py が書き出す先
+    tile_model: conch15_768                   # wsi-toolbox のモデル名（HDF5 キーのプレフィックス）
+  site_b:
+    original:   path/to/site_b/embedding
+    centroid:   path/to/centroid/site_b
+    gan:        path/to/gan/site_b
+    tile_model: conch15_768
+
+# ---- gan.py ----
+gan:
+  patch_size: 512   # cache/{patch_size}/gan/patches を参照
+  batch_size: 512
+  device:     auto  # cuda / cpu / auto
+  overwrite:  false
+
+# ---- titan.py ----
+titan:
+  device:    auto   # cuda / cpu / auto
+  overwrite: false
+  variants:  [original, gan]   # centroid はスライドレベル補正のため除外
+
+# ---- HDF5 キー ----
+# 完全キーは各スクリプトが以下のテンプレートで構築する:
+#   gan_patches / gan_coords : cache/{gan.patch_size}/{key}
+#   tile_features / tile_coords : {embedding.*.tile_model}/{key}
+#   slide_feature : {embedding.*.tile_model}/{key}
+keys:
+  gan_patches:   "gan/patches"
+  gan_coords:    "gan/coordinates"
+  tile_features: "features"
+  tile_coords:   "coordinates"
+  slide_feature: "aggregates/titan/feature"
+
+# ---- サブタイプ列の候補（CSV内を先頭から順に探す）----
+subtype_cols: [subtype]
+
+# ---- variants (umap / confusion_mtx / dendrogram の出力サブフォルダ) ----
+# 表示名: embedding 内の dir キー
+variants:
+  original: original
+  centroid: centroid
+  gan:      gan
+
+# ---- 補正の基準データセット ----
+# このデータセットは補正 variant でも常に original を使用する（reference 側）
+reference: site_a
+
+# ---- centroid.py ----
+centroid:
+  pca_n_components: 50   # PCA可視化前の事前削減次元 (null で生埋め込みをそのまま使用)
+  overwrite: false        # true にすると既存の centroid HDF5 を上書き
+
+# ---- umap_plot.py ----
+umap:
+  n_neighbors:  15
+  min_dist:     0.01
+  random_state: 42
+  markers: ["o", "s", "^", "D", "v", "P", "X", "*"]
+
+# ---- confusion_mtx.py / dendrogram.py ----
+comparison:
+  mmd: false   # true にすると MMD 行列も出力（時間がかかる）
+  mmd_kernels: [linear, rbf, laplacian, poly, polynomial, sigmoid, cosine, additive_chi2, chi2]
+
+# ---- 表示設定 ----
+display:
+  shortened:
+    subtypes:                          # 凡例・軸ラベルに使う略称
+      SFT:                             SFT
+      Meningothelial meningioma:       Meni
+      Fibrous meningioma:              Fibr
+      Transitional meningioma:         Tran
+      Psammomatous meningioma:         Psam
+      Angiomatous meningioma:          Angi
+      Microcystic meningioma:          Micr
+      Secretory meningioma:            Secr
+      Metaplastic meningioma:          Meta
+      Chordoid meningioma:             Chor
+      Rhabdoid meningioma:             Rhab
+      Atypical meningioma:             Atyp
+      Anaplastic meningioma:           Anap
+      Lymphoplasmacyte-rich meningioma: Lymp
+      Clear cell meningioma:           Clea
+      Papillary meningioma:            Papi
+      NOS meningioma:                  NOS
+  markers:
+    sources:
+      site_a: "o"
+      site_b: "s"
+  colors:
+    sft: "#000000"       # "sft" を含むサブタイプはすべて黒固定（大文字小文字不問）
+    sources:
+      site_a: "#4477AA"
+      site_b: "#EE6677"
+    subtypes:            # この順が凡例・UMAP・行列の表示順。未記載は tab20 で自動配色
+      SFT:                               "#000000"
+      Meningothelial meningioma:         "#1f77b4"
+      Fibrous meningioma:                "#aec7e8"
+      Transitional meningioma:           "#ff7f0e"
+      Psammomatous meningioma:           "#ffbb78"
+      Angiomatous meningioma:            "#2ca02c"
+      Microcystic meningioma:            "#98df8a"
+      Secretory meningioma:              "#8c564b"
+      Metaplastic meningioma:            "#c49c94"
+      Chordoid meningioma:               "#9467bd"
+      Rhabdoid meningioma:               "#c5b0d5"
+      Atypical meningioma:               "#d62728"
+      Anaplastic meningioma:             "#ff9896"
+      Lymphoplasmacyte-rich meningioma:  "#e377c2"
+      Clear cell meningioma:             "#f7b6d2"
+      Papillary meningioma:              "#7f7f7f"
+      NOS meningioma:                    "#c7c7c7"
+
+# ---- lp.py ----
+lp:
+  device:       auto   # cuda / cpu / auto
+  max_epochs:   1000
+  batch_size:   64
+  lr:           1.0e-4
+  weight_decay: 0.0
+  dropout:      0.0
+  num_workers:  0
+  val_fraction: 0.3    # hold-out 割合
+  patience:     50     # early stopping patience (val_loss 基準)
+  class_names:   {0: Meningioma, 1: SFT}
+  variants:      [original, centroid, gan]
+  evaluate_only: true   # true にすると訓練をスキップし既存 ckpt で評価のみ実行
+
+# ---- sft_distance_bar.py ----
+sft_distance:
+  variant:    centroid          # 補正後 variant を使用
+  metric:     euc_mean          # 平均ベクトル間ユークリッド距離
+
+# ---- 出力 ----
+output_dir: ./output

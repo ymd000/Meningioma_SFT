@@ -1,0 +1,22 @@
+[project]
+name = "meningioma-sft"
+version = "0.1.0"
+description = "Visualization and analysis scripts for Meningioma vs SFT embedding study"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "umap-learn",
+    "matplotlib",
+    "seaborn",
+    "h5py",
+    "pyyaml",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "scipy",
+    "lightning",
+    "wsi-toolbox",
+]
+
+[tool.uv.sources]
+wsi-toolbox = { git = "https://github.com/technoplasm/wsi-toolbox" }
