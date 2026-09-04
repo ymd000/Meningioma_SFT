@@ -33,6 +33,24 @@ cp config.example.yaml config.yaml
 
 ## フロー
 
+### 実行順
+
+```bash
+uv run python gan.py       # GAN 補正パッチを patch-level embedding に変換して gan/ に書き出し
+uv run python titan.py     # patch-level を slide-level に集約（original / gan の 2 variant）
+uv run python centroid.py  # slide-level を施設間で重心補正し centroid variant HDF5 を生成
+
+# 以下は順不同（可視化・評価）
+uv run python lp.py
+uv run python umap_plot.py
+uv run python subtype.py
+uv run python confusion_mtx.py
+uv run python dendrogram.py
+uv run python sft_distance_bar.py
+uv run python dataset.py   # 他スクリプトと独立。任意のタイミングで実行可
+```
+
+
 ### 前提
 
 - **施設数は 2 つであること**（`site_a` / `site_b` は `config.example.yaml` のプレースホルダ名。実際の施設名に置き換えて使う）。3 施設以上には対応していない。
@@ -92,15 +110,6 @@ centroid/{case}.h5     ← centroid.py の出力
 ```
 
 - `{gan.patch_size}` / `{tile_model}` は config の値に展開される（例: `cache/512/gan/patches`, `conch15_768/features`）
-- キー名（`features`, `coordinates`, `aggregates/titan/feature` 等）は `config.yaml` の `keys:` セクションで一括変更可能。`tile_model` の変更も `embedding.*.tile_model` の更新だけで済み、`keys:` は触らなくてよい
-
-### 実行順
-
-1. `gan.py`      — GAN 補正パッチを patch-level embedding に変換して `gan/` に書き出し
-2. `titan.py`   — patch-level を slide-level に集約（`original` / `gan` の 2 variant）
-3. `centroid.py` — slide-level を施設間で重心補正し `centroid` variant HDF5 を生成
-4. `lp.py` / `umap_plot.py` / `subtype.py` / `confusion_mtx.py` / `dendrogram.py` / `sft_distance_bar.py` — 順不同、可視化・評価スクリプト
-5. `dataset.py` — 症例数円グラフ（他スクリプトと独立、任意のタイミングで実行可）
 
 ## 概略図
 
