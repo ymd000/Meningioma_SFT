@@ -10,6 +10,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 from scipy.cluster.hierarchy import dendrogram, linkage
