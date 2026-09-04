@@ -35,7 +35,7 @@ cp config.example.yaml config.yaml
 
 ### 前提
 
-- **施設数は 2 つであること**（`site_a` / `site_b`）。3 施設以上には対応していない。
+- **施設数は 2 つであること**（`site_a` / `site_b` は `config.example.yaml` のプレースホルダ名。実際の施設名に置き換えて使う）。3 施設以上には対応していない。
 - 以下が済んでいること。
 
 ```
@@ -59,24 +59,50 @@ label:
 embedding:
   site_a:
     original:   path/to/site_a/embedding   # HDF5 ファイル群のディレクトリ
+    centroid:   path/to/centroid/site_a    # centroid.py が書き出す先
+    gan:        path/to/gan/site_a         # gan.py が書き出す先
     tile_model: conch15_768                # wsi-toolbox のモデル名（HDF5 キーのプレフィックス）
   site_b:
     original:   path/to/site_b/embedding
+    centroid:   path/to/centroid/site_b
+    gan:        path/to/gan/site_b
     tile_model: conch15_768
 ```
-- HDF5 内のキー構造が `config.yaml` 通りに存在すること。 キー構造は `config.yaml` の `keys:` セクションで管理する。
+- HDF5 ファイルは **variant ごとに別ディレクトリ**（`embedding.*.original` / `.gan` / `.centroid`）に配置する。3 variant は同じキー `{tile_model}/aggregates/titan/feature` に slide embedding を書くため、同一 HDF5 に共存させられない。
 
-| config キー | 完全キーのテンプレート | 用途 |
-|---|---|---|
-| `keys.gan_patches` | `cache/{gan.patch_size}/{key}` | `gan.py` が読む GAN補正済みパッチ |
-| `keys.gan_coords` | `cache/{gan.patch_size}/{key}` | 同パッチの座標（フォールバックは `tile_coords`）|
-| `keys.tile_features` | `{tile_model}/{key}` | `gan.py` が書く・`titan.py` が読む patch embedding |
-| `keys.tile_coords` | `{tile_model}/{key}` | 同座標 |
-| `keys.slide_feature` | `{tile_model}/{key}` | `titan.py` が書く・解析スクリプトが読む slide embedding |
+```
+original/{case}.h5     ← 前処理ツール ([wsi_gan] / [wsi-toolbox]) の出力
+├── cache/{gan.patch_size}/
+│   ├── gan/patches       [wsi_gan]      → gan.py が読む
+│   └── gan/coordinates   [wsi_gan]      → gan.py が読む
+└── {tile_model}/
+    ├── features          [wsi-toolbox]  → titan.py が読む
+    ├── coordinates       [wsi-toolbox]  → titan.py が読む
+    └── aggregates/titan/feature         ← titan.py が書く      → 解析が読む
 
-`tile_model` を変更する場合は `embedding.*.tile_model` を更新するだけでよい。`keys:` の値を変える必要はない。
+gan/{case}.h5          ← gan.py + titan.py の出力
+└── {tile_model}/
+    ├── features                         ← gan.py が書く        → titan.py が読む
+    ├── coordinates                      ← gan.py が書く        → titan.py が読む
+    └── aggregates/titan/feature         ← titan.py が書く      → 解析が読む
 
-### 概略図
+centroid/{case}.h5     ← centroid.py の出力
+└── {tile_model}/
+    └── aggregates/titan/feature         ← centroid.py が書く   → 解析が読む
+```
+
+- `{gan.patch_size}` / `{tile_model}` は config の値に展開される（例: `cache/512/gan/patches`, `conch15_768/features`）
+- キー名（`features`, `coordinates`, `aggregates/titan/feature` 等）は `config.yaml` の `keys:` セクションで一括変更可能。`tile_model` の変更も `embedding.*.tile_model` の更新だけで済み、`keys:` は触らなくてよい
+
+### 実行順
+
+1. `gan.py`      — GAN 補正パッチを patch-level embedding に変換して `gan/` に書き出し
+2. `titan.py`   — patch-level を slide-level に集約（`original` / `gan` の 2 variant）
+3. `centroid.py` — slide-level を施設間で重心補正し `centroid` variant HDF5 を生成
+4. `lp.py` / `umap_plot.py` / `subtype.py` / `confusion_mtx.py` / `dendrogram.py` / `sft_distance_bar.py` — 順不同、可視化・評価スクリプト
+5. `dataset.py` — 症例数円グラフ（他スクリプトと独立、任意のタイミングで実行可）
+
+## 概略図
 
 ```
 ┌──────────────────────────────────┐
@@ -104,17 +130,18 @@ HDF5: cache/{size}/gan/patches
                       ▼  slide-level embedding (HDF5)
 ┌──────────────────────────────────────────────────────────┐
 │  centroid.py  — 施設間重心補正                           │
-│  → 補正済み HDF5 を centroid/ に書き出し                 │
+│  → 補正済み slide embedding を centroid variant HDF5 に  │
+│    書き出し（配置は embedding.*.centroid で指定）        │
 │  → PCA 3パネル / シフトノルム棒グラフ / ASW 評価         │
 └──────────────────────────────────────────────────────────┘
-                      │
-           ┌──────────┴──────────┐
-           │ before (original)   │ after (centroid)
-           ▼                     ▼
+                      │  (original / centroid / gan)
+                      ▼
 ┌──────────────────────────────────────────────────────────┐
 │  lp.py  — Linear Probe 交差データセット評価              │
-│  施設 A で訓練 → 施設 B でテスト（補正前後を比較）       │
-│  → confusion matrix / metrics.csv / comparison.csv       │
+│  施設 A→B と B→A の双方向 × 3 variant (original /        │
+│  centroid / gan) を比較                                  │
+│  → confusion_matrix{,_norm}.png / metrics.csv /          │
+│    comparison.csv / checkpoints/ / logs/                 │
 └──────────────────────────────────────────────────────────┘
                       │
                       ▼  
@@ -125,9 +152,3 @@ HDF5: cache/{size}/gan/patches
   dendrogram.py         施設間距離の樹形図（補正前後）
   sft_distance_bar.py   SFT と各サブタイプ間の距離棒グラフ
 ```
-
-## 原則
-
-- **1 figure = 1 Python file**。共通処理はファイル間で共有せず、各スクリプトに直接書く
-- 設定（パス・色・パラメータ）はすべて `config.yaml` に集約し、スクリプト内にハードコードしない
-- `argparse` は使わない。試行錯誤は `config.yaml` の編集で行う
